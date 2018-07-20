@@ -49,18 +49,21 @@ void fitXsec() {
 	}
     }
 
-    TH1F * h_scan_0 = new TH1F("h_scan_0","",100,0,1);
-    TH1F * h_scan_1 = new TH1F("h_scan_1","",100,0,1);
-    TH1F * h_scan_2 = new TH1F("h_scan_2","",100,0,1);
-    TH1F * h_scan_3 = new TH1F("h_scan_3","",100,0,1);
+    int maxScan = 100;
     
-    for (int nScan = 0; nScan < 100; nScan++) {
+    TH1F * h_scan_0 = new TH1F("h_scan_0","",maxScan,0,maxScan);
+    TH1F * h_scan_1 = new TH1F("h_scan_1","",maxScan,0,maxScan);
+    TH1F * h_scan_2 = new TH1F("h_scan_2","",maxScan,0,maxScan);
+    TH1F * h_scan_3 = new TH1F("h_scan_3","",maxScan,0,maxScan);
+    
+    for (int nScan = 0; nScan < maxScan; nScan++) {
 	TH1F* hs_mc_0 = new TH1F("hs_mc_0","",40,-500,500);
 	TH1F* hs_mc_1 = new TH1F("hs_mc_1","",40,0,1000);
         TH1F* hs_mc_2 = new TH1F("hs_mc_2","",40,-500,100);
 	TH1F* hs_mc_3 = new TH1F("hs_mc_3","",40,0,700);
 
-	float weight = TMath::Exp(-0.01*(nScan));
+	float weight = TMath::Exp(-float(1./maxScan)*(nScan));
+	TString xtitle = "TMath::Exp(-0.01*(x))";
 	//std::cout<<"weight="<<weight<<std::endl;
 	//weight = 1.0;
 	
@@ -108,6 +111,9 @@ void fitXsec() {
     }
 
     gStyle->SetOptStat(0);
+    h_scan_0->GetXaxis()->SetTitle(xtitle);
+    h_scan_0->GetYaxis()->SetTitle("#Sigma (data-mc)^{2}");
+    h_scan_0->GetYaxis()->SetTitleOffset(1.4);
     h_scan_0->DrawNormalized();
     h_scan_2->SetLineColor(kRed);
     h_scan_2->DrawNormalized("same");
