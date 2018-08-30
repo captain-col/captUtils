@@ -60,11 +60,9 @@ void efficiency() {
     Float_t bins[] = { 0,20,40,60,80,
 		       100,120,140,160,180,
 		       200,220,240,260,
-		       300,340,360,
-		       400,
-		       500,560,
-		       640,		       
-		       800,
+		       309,345,388,
+		       443,
+		       512,605,735,		       
 		       1000};
     Int_t  binnum = sizeof(bins)/sizeof(Float_t) - 1;
     Float_t bins2[] = {0,20,40,60,80,
@@ -91,9 +89,9 @@ void efficiency() {
     
     TH2F *h_tL_tE = new TH2F("h_tL_tE","",binnum,bins,binnum2,bins2);
     //TH2F *h_tL_tE = new TH2F("h_tL_tE","",100,0,2000,100,0,1000);
-
     TH2F *h_tX_tE = new TH2F("h_tX_tE","",binnum,bins,binnum3,bins3);
-
+    TH1F *h_tE = new TH1F("h_tE","",1000,0,1000);
+    
     int nentries = tree->GetEntries();
 
     int ntracks_beamC=0;
@@ -168,12 +166,13 @@ void efficiency() {
 				if (abs((*minX)[j]) < 400 && (*minX)[j] < 0) {
 				    h_tL_tE->Fill((*E_corr)[j],(*trackL)[j]);
 				    h_tX_tE->Fill((*E_corr)[j],(*minX)[j]);
+				    h_tE->Fill((*E_corr)[j]);
 				}
 			    }
 		    }
 	    }
 	    
-	    if (rev != revC) std::cout<<"run="<<run<<" ev="<<event<<" rev="<<rev<<" "<<revC<<std::endl;
+	    //if (rev != revC) std::cout<<"run="<<run<<" ev="<<event<<" rev="<<rev<<" "<<revC<<std::endl;
 
 	}
 
@@ -189,4 +188,6 @@ void efficiency() {
     h_tX_tE->Draw("colz");
     TCanvas *c2 = new TCanvas("c2");
     h_tL_tE->Draw("colz");
+    TCanvas *c3 = new TCanvas("c3");
+    h_tE->Draw();
 }
