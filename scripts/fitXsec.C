@@ -139,7 +139,7 @@ void fitXsecChi2() {
     
 }
 
-void fitXsecDataOnly( double Emin, double Emax) {
+std::pair<double,double> fitXsecDataOnly( double Emin, double Emax) {
     TChain *c_data = new TChain("tracks");
     //c_data->Add("tracks_golden.root");
     c_data->Add("~/work/captain/software/work-area/captSummary/cmt/nb_mtpc_spl_012*_000_flat_beam*.root");
@@ -158,9 +158,10 @@ void fitXsecDataOnly( double Emin, double Emax) {
     c_data->SetBranchAddress("corrected_first_hit_Z",&corrected_first_hit_Z);
     c_data->SetBranchAddress("corrected_PDS_energy",&corrected_PDS_energy);
     
-    TH1F* hs_data = new TH1F("hs_data","",60,-500,100);
+    TH1F* hs_data = new TH1F("hs_data","",100,-500,100);
 
     Int_t nEntries = c_data->GetEntries();
+    std::vector<double> selected_X;
 
     for (int iev=0; iev<nEntries; iev++) {
 	c_data->GetEntry(iev);
@@ -171,31 +172,83 @@ void fitXsecDataOnly( double Emin, double Emax) {
 	    double e = corrected_PDS_energy->at(t);
 	    if (inBeamXY(x,y) && z > -195 && z < -145 && x < 0.0 && x > -400 && e > Emin && e < Emax) {
 		hs_data->Fill(x);
+		selected_X.push_back(x);
 	    }
 	}
     }
 
-    hs_data->Draw("ep");
+    const Int_t nq = 4;
+    Double_t xq[nq];  // position where to compute the quantiles in [0,1]
+    Double_t yq[nq];  // array to contain the quantiles
+    for (Int_t i=0;i<nq;i++) xq[i] = Float_t(i+1)/nq;
+    hs_data->GetQuantiles(nq,yq,xq);
+    //for (Int_t i=0;i<nq;i++) std::cout<<"i="<<xq[i]<<" Q ="<<yq[i]<<std::endl;
+    // std::cout<<"IQR="<<2*abs(yq[0]-yq[2])/pow(hs_data->GetEntries(),1/3.)<<std::endl;
+
+    double binWidth = 2*abs(yq[0]-yq[2])/pow(hs_data->GetEntries(),1/3.);
+    int nBins = int(600.0/binWidth + 0.5);
+    // std::cout<<"Nbins="<<nBins<<std::endl;
+
+    TH1F* hs_xpos = new TH1F("hs_xpos","",nBins,-500,100);
+    for (int ix=0; ix<selected_X.size(); ix++) hs_xpos->Fill(selected_X[ix]);
+    hs_xpos->Draw("ep");
+
+    gStyle->SetOptFit(1);
     TCanvas *c = new TCanvas("c");
-    TF1 *func = new TF1("func","expo",-400,0);
-    hs_data->Fit("func","R");
-    hs_data->Draw("ep");
+    TF1 *func = new TF1("func","expo",-391,-9);
+    hs_xpos->Fit("func","RQM");
+    hs_xpos->Draw("ep");
     TString fname;
     fname.Form("fits/fit_%.1f_%.1f.pdf",Emin,Emax); 
-    c->Print(fname);
+    // c->Print(fname);
+    // fname.Form("fits/fit_%.1f_%.1f.png",Emin,Emax); 
+    // c->Print(fname);
     
     hs_data->Delete();
-    //c->Delete();
+    hs_xpos->Delete();
+    
+    c->Close();
+    return std::make_pair(func->GetParameter(1),func->GetParError(1));
 }
 
 void fitXsec() {
 
-    fitXsecDataOnly(100.0,200.0);
-    fitXsecDataOnly(200.0,300.0);
-    fitXsecDataOnly(300.0,400.0);
-    fitXsecDataOnly(400.0,500.0);
-    fitXsecDataOnly(500.0,600.0);
-    fitXsecDataOnly(600.0,700.0);
-    fitXsecDataOnly(700.0,800.0);
+    double slope = 0.0;
+    double slopeE = 0.0;
     
+    slope = fitXsecDataOnly(0.0,2000.0).first;
+    slopeE = fitXsecDataOnly(0.0,2000.0).second;
+    std::cout<<"Slope="<<slope<<"+/-"<<slopeE<<" Xsec="<<1./slope<<"+/-"<< abs(1./slope)*sqrt((float(slopeE)/float(slope))*(float(slopeE)/float(slope)))<<std::endl;
+    
+    const Int_t nq = 7;
+    Double_t xq[nq];
+    Double_t yq[nq];
+    Double_t xqE[nq];
+    Double_t yqE[nq];
+
+    for (int i=0;i<7;i++) {
+	xq[i] = 150+i*100;
+	xqE[i] = 50;
+	slope = fitXsecDataOnly(100.0+100*i,200.0+100*i).first;
+	slopeE = fitXsecDataOnly(100.0+100*i,200.0+100*i).second;
+	double N_Ar = 1.3973  * 6.022E23  / 39.948; // (g/cm3 * n/mol) / g/mol = n/cm3 
+	yq[i] =  (1./slope)/(100*100*N_Ar);
+	yqE[i] = abs(yq[i])*sqrt((float(slopeE)/float(slope))*(float(slopeE)/float(slope)));	
+	std::cout<<"Emin="<<100.0+100*i<<" Emax="<< 200.0+100*i<<" Slope="<<slope<<"+/-"<<slopeE<<" Xsec="<<yq[i]<<"+/-"<< yqE[i]<<std::endl;
+    }
+
+    TCanvas *c = new TCanvas("c");
+    TGraphErrors *gr = new TGraphErrors(nq,xq,yq,xqE,yqE);
+    gr->SetTitle("Neutron Cross Section");
+    gr->SetMarkerColor(4);
+    gr->SetMarkerStyle(21);
+    TString xtitle = "Energy[MeV]";
+    TString ytitle = "#sigma[b]";
+    gr->GetYaxis()->SetTitle(ytitle.Data());
+    gr->GetXaxis()->SetTitle(xtitle.Data());
+    //gr->GetYaxis()->SetTitleOffset(1.5);
+
+    gr->Draw("ALP");
+    c->Print("fits/Xsec.png");																		  
+    c->Print("fits/Xsec.pdf");																		  
 }
