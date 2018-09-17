@@ -150,13 +150,20 @@ std::pair<double,double> fitXsecDataOnly( double Emin, double Emax) {
     std::vector<double> *first_hit_Z = 0;
     std::vector<double> *corrected_first_hit_Z = 0;
     std::vector<double> *corrected_PDS_energy = 0;
-    
+
+    std::vector<double> *last_hit_X = 0;
+    std::vector<double> *last_hit_Y = 0;
+    std::vector<double> *corrected_last_hit_Z = 0;
+
     c_data->SetBranchAddress("track_length",&track_length);
     c_data->SetBranchAddress("first_hit_X",&first_hit_X);
     c_data->SetBranchAddress("first_hit_Y",&first_hit_Y);
     c_data->SetBranchAddress("first_hit_Z",&first_hit_Z);
     c_data->SetBranchAddress("corrected_first_hit_Z",&corrected_first_hit_Z);
     c_data->SetBranchAddress("corrected_PDS_energy",&corrected_PDS_energy);
+    c_data->SetBranchAddress("last_hit_X",&last_hit_X);
+    c_data->SetBranchAddress("last_hit_Y",&last_hit_Y);
+    c_data->SetBranchAddress("corrected_last_hit_Z",&corrected_last_hit_Z);
     
     TH1F* hs_data = new TH1F("hs_data","",100,-500,100);
 
@@ -169,8 +176,11 @@ std::pair<double,double> fitXsecDataOnly( double Emin, double Emax) {
 	    double x = first_hit_X->at(t);
 	    double y = first_hit_Y->at(t);
 	    double z = corrected_first_hit_Z->at(t);
+	    double xf = last_hit_X->at(t);
+	    double yf = last_hit_Y->at(t);
+	    double zf = corrected_last_hit_Z->at(t);
 	    double e = corrected_PDS_energy->at(t);
-	    if (inBeamXY(x,y) && z > -195 && z < -145 && x < 0.0 && x > -400 && e > Emin && e < Emax) {
+	    if (inBeamXY(x,y) && z > -195 && z < -145 && x < 0.0 && x > -400 && e > Emin && e < Emax && abs(xf) < 450 && abs(yf) < 450 && zf < 0.0 && zf > -300) {
 		hs_data->Fill(x);
 		selected_X.push_back(x);
 	    }
@@ -199,10 +209,10 @@ std::pair<double,double> fitXsecDataOnly( double Emin, double Emax) {
     hs_xpos->Fit("func","RQM");
     hs_xpos->Draw("ep");
     TString fname;
-    fname.Form("fits/fit_%.1f_%.1f.pdf",Emin,Emax); 
-    // c->Print(fname);
-    // fname.Form("fits/fit_%.1f_%.1f.png",Emin,Emax); 
-    // c->Print(fname);
+    fname.Form("fits/fit_%.1f_%.1f_Restricted.pdf",Emin,Emax); 
+    c->Print(fname);
+    fname.Form("fits/fit_%.1f_%.1f_Restricted.png",Emin,Emax); 
+    c->Print(fname);
     
     hs_data->Delete();
     hs_xpos->Delete();
@@ -229,11 +239,11 @@ void fitXsec() {
     for (int i=0;i<7;i++) {
 	xq[i] = 150+i*100;
 	xqE[i] = 50;
-	slope = fitXsecDataOnly(100.0+100*i,200.0+100*i).first;
-	slopeE = fitXsecDataOnly(100.0+100*i,200.0+100*i).second;
+	slope = 10 * fitXsecDataOnly(100.0+100*i,200.0+100*i).first; // 1/cm
+	slopeE = 10 * fitXsecDataOnly(100.0+100*i,200.0+100*i).second;
 	double N_Ar = 1.3973  * 6.022E23  / 39.948; // (g/cm3 * n/mol) / g/mol = n/cm3 
-	yq[i] =  (1./slope)/(100*100*N_Ar);
-	yqE[i] = abs(yq[i])*sqrt((float(slopeE)/float(slope))*(float(slopeE)/float(slope)));	
+	yq[i] =  1e24*(slope)/(N_Ar);
+	yqE[i] = 1e24*slopeE/(N_Ar);
 	std::cout<<"Emin="<<100.0+100*i<<" Emax="<< 200.0+100*i<<" Slope="<<slope<<"+/-"<<slopeE<<" Xsec="<<yq[i]<<"+/-"<< yqE[i]<<std::endl;
     }
 
@@ -249,6 +259,6 @@ void fitXsec() {
     //gr->GetYaxis()->SetTitleOffset(1.5);
 
     gr->Draw("ALP");
-    c->Print("fits/Xsec.png");																		  
-    c->Print("fits/Xsec.pdf");																		  
+    c->Print("fits/Xsec_Restricted.png");																		  
+    c->Print("fits/Xsec_Restricted.pdf");																		  
 }
